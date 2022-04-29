@@ -135,7 +135,8 @@ function doisearch(showFormClicked) {
                       var warn = $('<div/>')
                       .html( 'The journal publishing this article, <b>' + data.container_title + '</b>, was not found in the list.'
                            + ' To add this journal, please submit an issue to our <a href="https://github.com/aims-group/publication-site/issues/">GitHub Issues</a> page'
-                           + ' with the title: <br> <b>"Please add journal named: ' + data.container_title + '."</b> <br><br>'
+                           + ' with the title: <br> <b>"Please add journal named: ' + data.container_title + '"</b>, and include in the issue description'
+                           + ' the URL of the journal\'s website or the DOI of an article that appears in the journal. <br><br>'
                            + ' Currently, your publication will be registered with journal set to "Other".  Once you\'ve submitted the issue,'
                            + ' as described above, and the journal name you requested has been added to the list, please go to the Edit'
                            + ' page, select your publication, and replace "Other" with the actual name of the journal.')
