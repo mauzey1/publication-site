@@ -49,3 +49,9 @@ ul.nav.navbar-nav li a:hover,
     height:30px;
     margin-top:-5px
 }
+
+@media (min-width: 1600px) {
+    .container{
+        width: 1440px;
+    }
+}
