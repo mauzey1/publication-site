@@ -211,6 +211,15 @@ $('#facet-links-container input.radio-sort').change(function(){
                 info_titles += "<th>Frequency</th>";
                 info_columns += "<td>" + rows + "</td>";
               }
+              if(data.realms.length > 0){
+                var rows = "";
+                for (var i = 0, len = data.realms.length; i < len; i++){
+                    var link = data.realms[i].replace(' ', '%20')
+                    rows += "<a href=\"?type=realm&option=" + link + "\">" + data.realms[i] + "<a/><br/>";
+                }
+                info_titles += "<th>Realms</th>";
+                info_columns += "<td>" + rows + "</td>";
+              }
               output =  "<table class=\"table\">" +
                         info_titles +
                         "<tr>" + info_columns + "</tr>" +

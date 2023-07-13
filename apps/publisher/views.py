@@ -1117,11 +1117,13 @@ def ajax_more_info(request, pub_id):
     experiment_list = sorted(set([str(exp) for exp in pub.experiments.all()]))
     model_list = sorted(set([str(model) for model in pub.model.all()]))
     frequency_list = sorted(set([str(freq) for freq in pub.frequency.all()]))
+    realm_list = sorted(set([str(rel) for rel in pub.realms.all()]))
     
     json = {'activities': activity_list,
             'experiments': experiment_list, 
             'models': model_list, 
-            'frequency': frequency_list}
+            'frequency': frequency_list,
+            'realms': realm_list}
     return JsonResponse(json)
 
 
