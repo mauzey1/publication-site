@@ -1,14 +1,16 @@
-.. Publication Hub documentation master file, created by
-   sphinx-quickstart on Thu Oct  5 13:28:58 2017.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Publication Hub
+===================
 
-Welcome to Publication Hub's documentation!
-===========================================
+Publication Hub is a Django application for cataloging, searching, and managing
+an organization's publications. It supports project-specific tags and includes
+optional climate science metadata.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Setup and operation
 
    Getting Started
-
+   native-development
+   docker-development
+   production
+   configuration

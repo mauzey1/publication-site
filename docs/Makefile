@@ -1,20 +1,14 @@
-# Minimal makefile for Sphinx documentation
-#
+SPHINXBUILD ?= python -m sphinx
+SPHINXOPTS ?= -W --keep-going
 
-# You can set these variables from the command line.
-SPHINXOPTS    =
-SPHINXBUILD   = python -msphinx
-SPHINXPROJ    = PublicationHub
-SOURCEDIR     = .
-BUILDDIR      = .
+.PHONY: html pages clean
 
-# Put it first so that "make" without argument is like "make help".
-help:
-	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+html:
+	$(SPHINXBUILD) -b html $(SPHINXOPTS) -d _build/doctrees . _build/html
 
-.PHONY: help Makefile
+# Preserve the existing root redirect and /html/ URLs in the Pages artifact.
+pages: html
+	python -c "from pathlib import Path; import shutil; p = Path('_build/pages'); shutil.rmtree(p) if p.exists() else None; shutil.copytree('_build/html', p / 'html', ignore=shutil.ignore_patterns('.buildinfo*')); shutil.copy2('index.html', p / 'index.html'); shutil.copy2('.nojekyll', p / '.nojekyll')"
 
-# Catch-all target: route all unknown targets to Sphinx using the new
-# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-%: Makefile
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+clean:
+	python -c "import shutil; shutil.rmtree('_build', ignore_errors=True)"
