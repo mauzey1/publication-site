@@ -1,17 +1,30 @@
 Docker development
-======================
+==================
 
-Prerequisites and environment files
----------------------------------------
+Run Publication Hub locally with Docker Compose and PostgreSQL. Follow the steps
+below in order. The application runs in a Python 3.12 container and uses
+PostgreSQL 16.3.
+
+Step 1: Check the prerequisites
+-------------------------------
 
 Install Git, Docker Engine (or Docker Desktop), and Docker Compose v2. Start
-Docker and verify ``docker info`` and ``docker compose version`` from any
-directory. The stack uses PostgreSQL 16.3 and a Python 3.12 application image.
+Docker, then run these checks from any directory:
+
+.. code-block:: bash
+
+   docker info
+   docker compose version
+
+Both commands should succeed, and Compose should report version 2 or later.
 Ports 8000 and 5433 and container names ``django`` and ``postgres`` must be free.
 The checked-in Compose file publishes these ports on all host interfaces, so
 use this setup on a trusted development machine.
 
-From the directory where you keep checkouts:
+Step 2: Download the code
+-------------------------
+
+From the directory where you want to store the repository:
 
 .. code-block:: bash
 
@@ -19,8 +32,14 @@ From the directory where you keep checkouts:
    cd publication-site/pubhub
    mkdir -p .envs
 
-All remaining commands run from ``publication-site/pubhub``. Create
-``.envs/.django`` with these complete, development-only contents:
+Run all remaining commands from ``publication-site/pubhub``.
+
+Step 3: Create the environment files
+------------------------------------
+
+Create ``.envs/.django`` with the following contents. These example credentials
+are for local development only. If the file already exists, review its values
+before making changes.
 
 .. code-block:: text
 
@@ -44,62 +63,104 @@ Create ``.envs/.postgres``:
    POSTGRES_USER=pubhub
    POSTGRES_PASSWORD=unsafe-local-database-password
 
-Do not replace existing environment files without reviewing them. These files
-are ignored by Git. Compose injects their values into the containers;
-``manage.py`` alone does not read them. The explicit settings module selects
-PostgreSQL instead of the native SQLite default. Inside Docker, PostgreSQL is
-``postgres:5432``; from the host it is ``localhost:5433``. ``EMAIL_HOST=localhost``
-here means the Django container, not your host; see :ref:`email` before testing
-password reset.
+Git ignores both files. Compose loads their values into the containers when it
+creates them. ``DJANGO_SETTINGS_MODULE=config.settings.docker`` selects the
+PostgreSQL settings. Containers connect to PostgreSQL at ``postgres:5432``;
+tools on your host connect at ``localhost:5433``.
 
-Build, start, and verify
-----------------------------
+For email, ``localhost`` refers to the Django container. No mail server is
+included; see :ref:`email` before testing password reset.
+
+Step 4: Build and start the containers
+--------------------------------------
 
 With the environment files in place, from ``publication-site/pubhub``:
 
 .. code-block:: bash
 
    docker compose config --quiet
+
+If validation succeeds, build the images and start the containers:
+
+.. code-block:: bash
+
    docker compose up --build -d
+
+Follow the startup logs in a separate command:
+
+.. code-block:: bash
+
    docker compose logs -f django
 
-Startup waits for PostgreSQL, runs migration generation and migration application,
-collects static files, runs ``initialize``, and starts the development server on
-port 8000. This is the existing startup script's behavior; there is no need to
-run those steps separately. Metadata initialization does not create publications.
-When the server is ready, Ctrl-C exits the log viewer without stopping the stack.
+Wait until the logs show that the development server is listening on port 8000.
+Startup waits for PostgreSQL, generates and applies database migrations,
+collects static files, and loads the bundled metadata with ``initialize``.
+These steps run automatically. The database initially has no publications.
+
+Press Ctrl-C to exit the log viewer. The containers keep running.
+
+Step 5: Create an administrator account
+---------------------------------------
+
+Run the following command and enter a username, email address, and password at
+the prompts. Run it by itself and wait for it to finish before continuing:
 
 .. code-block:: bash
 
    docker compose exec django python manage.py createsuperuser
+
+Step 6: Verify the site
+-----------------------
+
+Check the application, database migrations, and HTTP responses:
+
+.. code-block:: bash
+
    docker compose exec django python manage.py check
    docker compose exec django python manage.py migrate --check
    docker compose ps
-   curl -I http://127.0.0.1:8000/
-   curl -I http://127.0.0.1:8000/static/uswds/css/uswds.min.css
+   curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/
+   curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/static/uswds/css/uswds.min.css
 
-Both services should be running, management checks should succeed, and both URLs
+Both services should be running, the management checks should succeed, and both URLs
 should return HTTP 200. Log in at http://127.0.0.1:8000/admin/ with your new
 administrator account. Registration separately requires :ref:`recaptcha`.
 
-Changes, logs, and persistence
-----------------------------------
+Use GET requests as shown above. The homepage returns HTTP 405 for HEAD requests
+(``curl -I``), even when the site is working.
 
-The current Compose configuration does **not** mount the source tree. Python,
-template, static asset, and dependency changes require a rebuild and recreation:
+Apply changes
+-------------
+
+The application code is copied into the image when it is built. After changing
+Python code, templates, static assets, or dependencies, rebuild the image and
+recreate the containers:
 
 .. code-block:: bash
 
    docker compose up --build -d
    docker compose logs --tail=100 django postgres
 
-Recheck the URLs above after the build. A container restart alone uses the old
-image. After environment-file changes, use ``docker compose up -d --force-recreate``.
-To pause and resume the existing containers:
+Repeat the checks in step 6 after the build. Restarting a container uses its
+existing image. After changing environment files, recreate the containers:
+
+.. code-block:: bash
+
+   docker compose up -d --force-recreate
+
+Stop and resume
+---------------
+
+To stop the containers:
 
 .. code-block:: bash
 
    docker compose stop
+
+To start them again:
+
+.. code-block:: bash
+
    docker compose start
    docker compose ps
 

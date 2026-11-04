@@ -4,21 +4,37 @@ Getting Started
 Choose your setup
 ---------------------
 
-* :doc:`native-development`: Python 3.12, a virtual environment, and SQLite.
-  Start here for the simplest local development setup.
-* :doc:`docker-development`: Docker Compose, PostgreSQL, and an application
-  image. Startup also loads the bundled climate metadata.
-* :doc:`production`: a new Linux deployment with PostgreSQL, Gunicorn, Traefik,
-  and an existing TLS certificate.
+Choose the guide that matches where you want to run Publication Hub. Each guide
+walks through installation, configuration, startup, and verification in order.
 
-All commands target Bash on macOS, Linux, or Windows through WSL; production
-commands target a Linux host. Each guide states the working directory. Commands
-that keep running should be left in their terminal while you verify the site
-from another terminal or a browser.
+* :doc:`native-development`: run locally with Python 3.12 and SQLite.
+  Choose this for the simplest development setup, without Docker.
+* :doc:`docker-development`: run locally with Docker Compose and PostgreSQL.
+  Choose this to develop with a PostgreSQL database. Startup also loads the
+  bundled climate metadata.
+* :doc:`production`: host the site on a Linux server with PostgreSQL, Gunicorn,
+  and Traefik. This guide requires a domain and an existing TLS certificate.
 
-A new database has no publications. The optional metadata initializer supplies
-project tags and journal names; it does not import publication records. See
-:doc:`configuration` for metadata, registration, email, and troubleshooting.
+Run the commands in Bash. Both development guides support macOS, Linux, or
+Windows through WSL; the production guide assumes a Linux server. Each step
+states which directory to use. Replace example domains, file paths, and secret
+values where instructed.
+
+Run command blocks in order and wait for each command to succeed before
+continuing. Commands that ask for input, such as ``createsuperuser``, have their
+own blocks. Answer their prompts before pasting another command. Server and log
+viewer commands also have separate blocks; follow the instructions beside each
+block to leave it running or stop it. Blocks labeled as file contents belong in
+the named file, rather than in the terminal.
+
+Test one setup at a time unless you have configured separate ports, container
+names, and Compose project names. Native and Docker development both use port
+8000, and both Docker guides normally use the Compose project name ``pubhub``.
+
+A new database has no publications. The optional ``initialize`` command adds
+project tags and journal names. Add publication records through the application
+after setup. See :doc:`configuration` to configure registration and email, learn
+about the bundled metadata, or troubleshoot a problem.
 
 Existing installations
 --------------------------

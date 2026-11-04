@@ -4,24 +4,26 @@ Configuration and troubleshooting
 Settings and environment
 ----------------------------
 
-Management commands run from ``publication-site/pubhub``. Native commands need
-the virtual environment activated. ``manage.py`` defaults to
-``config.settings.local``; Docker development must explicitly select
-``config.settings.docker`` and production must select
-``config.settings.production`` through ``DJANGO_SETTINGS_MODULE``.
+Run management commands from ``publication-site/pubhub``. For native development,
+activate the virtual environment first. The setup guides select these Django
+settings:
 
-Native Python does not automatically load ``.env`` or ``.envs`` files. Export
-supported variables in your shell before starting the server. Compose loads the
-``env_file`` paths in its YAML into containers; the proxy's ``.env`` supplies
-Compose build arguments instead. Recreate application containers after changing
-environment files. Rebuild Traefik after changing its domain or prefix.
+* Native development: ``config.settings.local``, the default for ``manage.py``.
+* Docker development: ``DJANGO_SETTINGS_MODULE=config.settings.docker``.
+* Production: ``DJANGO_SETTINGS_MODULE=config.settings.production``.
 
-The settings modules in ``pubhub/config/settings/`` are the source of truth.
-Only variables read there are supported. In particular, do not assume that
-arbitrary Django setting names become environment options. Several booleans use
-raw ``os.environ.get`` values, so a string such as ``False`` or ``0`` is nonempty
-and can enable an option. Keep the production security defaults. Local and Docker
-development settings always enable debug mode; production always disables it.
+For native development, export supported variables in your shell before starting
+the server; Python does not automatically read environment files. For Docker,
+Compose reads the files listed under ``env_file`` in the Compose configuration
+when it creates containers. Recreate the application containers after editing
+those files. Traefik uses its ``.env`` during the image build, so rebuild the
+proxy after changing its domain configuration.
+
+The files in ``pubhub/config/settings/`` define which environment variables are
+supported. A Django setting can be configured through the environment only if
+these files explicitly read it. Several boolean options treat any nonempty
+string, including ``False`` and ``0``, as true. Keep the production security
+defaults. Debug mode is always enabled in development and disabled in production.
 
 .. _metadata:
 
@@ -57,36 +59,40 @@ Registration and reCAPTCHA
 ------------------------------
 
 Public registration at ``/accounts/register/`` uses a reCAPTCHA v2 checkbox.
-Register the site's domain with `Google reCAPTCHA
-<https://www.google.com/recaptcha/admin/create>`_ and set
-``RECAPTCHA_PUBLIC_KEY`` (site key) and ``RECAPTCHA_PRIVATE_KEY`` (secret key).
-Use keys registered for your development hostname when testing locally. Blank
-values in the setup examples do not provide working registration. Browser access
-to Google and server-side verification access are required.
+To enable registration:
 
-For native development, export both values before starting ``runserver``. For
-Docker, put them in the appropriate Django environment file and recreate the
-container using the commands in its setup guide. Verify by completing a
-registration in the browser. ``createsuperuser`` and ordinary login do not use
-reCAPTCHA, so they work before these keys are configured.
+1. Register your site's domain with `Google reCAPTCHA
+   <https://www.google.com/recaptcha/admin/create>`_ and select the v2 checkbox.
+   For local testing, register your development hostname.
+2. Set ``RECAPTCHA_PUBLIC_KEY`` to the site key and ``RECAPTCHA_PRIVATE_KEY`` to
+   the secret key. For native development, export both variables in your shell.
+   For Docker, add them to the Django environment file from your setup guide.
+3. Restart the native development server, or recreate the Django container using
+   the commands in your setup guide.
+4. Open ``/accounts/register/`` and complete a registration. Both the browser
+   and the server must be able to reach Google's reCAPTCHA service.
+
+The blank keys in the setup examples leave registration unconfigured.
+Administrator account creation with ``createsuperuser`` and ordinary login work
+without reCAPTCHA.
 
 .. _email:
 
 Email and password reset
 ----------------------------
 
-The shipped settings support ``EMAIL_HOST``, ``EMAIL_PORT``, and
-``DEFAULT_FROM_EMAIL`` as environment variables. Django's default SMTP backend
-is used. The defaults are ``localhost:1025``; no SMTP server is bundled. In a
-container, ``localhost`` refers to that container. Use a reachable SMTP relay or
-mail catcher for testing, then configure an appropriate relay for deployment.
+Publication Hub sends mail using Django's SMTP backend. Configure
+``EMAIL_HOST``, ``EMAIL_PORT``, and ``DEFAULT_FROM_EMAIL`` to use a reachable mail
+server. The default address is ``localhost:1025``, and no mail server is included.
+Inside a container, ``localhost`` refers to that container. For development, you
+can use a mail catcher to view test messages.
 
 The shipped settings do not read ``EMAIL_HOST_USER``, ``EMAIL_HOST_PASSWORD``,
 ``EMAIL_USE_TLS``, ``EMAIL_USE_SSL``, or ``EMAIL_BACKEND`` from the environment.
 Adding these names to an environment file alone has no effect. An SMTP provider
 requiring authentication or TLS needs a separately maintained Django settings
-module that configures those settings, or a suitable relay. Do not enter provider
-credentials in unsupported environment fields and expect delivery to work.
+module that configures those settings, or a relay that handles authentication
+and encryption for the application.
 
 With a relay configured, from ``publication-site/pubhub`` and the active native
 virtual environment, replace the recipient with a mailbox you control:
@@ -96,7 +102,7 @@ virtual environment, replace the recipient with a mailbox you control:
    python manage.py shell -c "from django.core.mail import send_mail; from django.conf import settings; print(send_mail('Publication Hub mail test', 'SMTP is configured.', settings.DEFAULT_FROM_EMAIL, ['operator@example.org'], fail_silently=False))"
 
 For Docker, use the command prefixes described under :ref:`metadata`. Expect
-``1`` and confirm receipt. Then exercise ``/accounts/password_reset/`` with the
+``1`` and confirm receipt. Then open ``/accounts/password_reset/`` and enter the
 email address of an existing active user. A success page alone does not prove
 email delivery.
 
@@ -172,7 +178,7 @@ Certificate or port errors
 A default/untrusted certificate usually means the certificate bind mount is
 missing, filenames differ from ``cert.pem``/``key.pem``, or Traefik cannot read
 them. Confirm the certificate chain, expiry, domain, matching key, and any
-symlink targets. Use the proxy logs and ``curl -I https://YOUR_DOMAIN/``;
+symlink targets. Use the proxy logs and ``curl -sS -o /dev/null -w '%{http_code}\n' https://YOUR_DOMAIN/``;
 fix verification failures before accepting the deployment.
 
 An address already in use error means another process/container owns a required

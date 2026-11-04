@@ -22,12 +22,23 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 unset DJANGO_SETTINGS_MODULE
 python manage.py migrate
+```
+
+Create an administrator account. Run this command by itself and answer its
+prompts before continuing:
+
+```bash
 python manage.py createsuperuser
+```
+
+Start the server and leave this terminal open:
+
+```bash
 python manage.py runserver
 ```
 
 Open <http://127.0.0.1:8000/> and sign in at <http://127.0.0.1:8000/admin/>.
-In another terminal, `curl -I http://127.0.0.1:8000/` should return HTTP 200.
+In another terminal, `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/` should return HTTP 200.
 The database is `pubhub/local.sqlite3` (ignored by Git); initially it contains no
 publications. Optional `python manage.py initialize` adds bundled project tags
 and journal names, not publications.

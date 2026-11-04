@@ -1,12 +1,24 @@
 Production deployment
-=========================
+=====================
 
-Prerequisites
------------------
+Deploy a new Publication Hub installation on a Linux server with PostgreSQL,
+Gunicorn, and Traefik. Traefik handles HTTPS using a certificate you provide.
+Follow the numbered steps in order, then use the maintenance instructions to
+manage the running site.
+
+Step 1: Check the prerequisites
+-------------------------------
 
 This procedure creates a **new installation** on a Linux host with Git, Docker
-Engine, Docker Compose v2, Bash, and OpenSSL. From any directory, verify
-``docker info``, ``docker compose version``, and ``openssl version``. You need:
+Engine, Docker Compose v2, Bash, and OpenSSL. Run these checks from any directory:
+
+.. code-block:: bash
+
+   docker info
+   docker compose version
+   openssl version
+
+All three commands should succeed. You also need:
 
 * A domain such as ``publications.example.org`` with DNS pointing to the host.
 * An existing TLS certificate chain and matching private key for that domain.
@@ -16,28 +28,47 @@ Engine, Docker Compose v2, Bash, and OpenSSL. From any directory, verify
   rules that cover Docker-published ports so requests enter through Traefik.
 * A location for off-host database backups.
 
-Use the domain root. Leave ``DOMAIN_SUBDIRECTORY`` empty; this guide does not
-configure Django for a URL subdirectory. The bundled proxy sends HSTS headers,
-including subdomains, so use a domain whose subdomains support HTTPS.
-For an existing database, follow the migration links in :doc:`Getting Started`.
+Serve the site at the domain root, such as ``https://publications.example.org/``,
+and leave ``DOMAIN_SUBDIRECTORY`` empty. The bundled proxy uses HTTP Strict
+Transport Security (HSTS) to require HTTPS for the domain and its subdomains.
+Make sure those subdomains support HTTPS as well.
 
-Checkout and environment
-----------------------------
+For an existing database, read the migration guide linked from
+:doc:`Getting Started` before proceeding.
 
-From the directory where you keep deployments:
+Step 2: Download the code
+-------------------------
+
+On the server, start in the directory where you want to store the repository:
 
 .. code-block:: bash
 
    git clone https://github.com/aims-group/publication-site.git
    cd publication-site
    mkdir -p pubhub/.envs
-   openssl rand -hex 32
+
+Step 3: Create the application environment file
+-----------------------------------------------
+
+Generate two separate secrets. Each command prints 32 random bytes as 64
+hexadecimal characters; it does not save the value. Copy the first output for
+the Django secret key and the second for the PostgreSQL password. Keep both
+outputs private:
+
+.. code-block:: bash
+
    openssl rand -hex 32
 
-Save the first random value as the Django secret key and the second as the
-PostgreSQL password. From the checkout root, create ``pubhub/.envs/.prod.env``
-with the following contents, replacing both ``REPLACE_WITH_...`` placeholders
-and the example domain:
+Save that output as the Django secret key. Then generate the database password:
+
+.. code-block:: bash
+
+   openssl rand -hex 32
+
+From the checkout root, create ``pubhub/.envs/.prod.env`` with the following
+contents. Paste the first output into ``DJANGO_SECRET_KEY`` and the second into
+``POSTGRES_PASSWORD``, replacing the placeholders. Replace the example domain
+with your domain:
 
 .. code-block:: text
 
@@ -69,12 +100,13 @@ From the checkout root, protect the environment file:
 
    chmod 600 pubhub/.envs/.prod.env
 
-Compose reads this ignored file at container creation. Keep it private and backed
-up; a database password change in the file does not change an existing database
-role's password.
+Git ignores this file. Compose loads its values when it creates the containers.
+Keep a private backup of the file. If you change ``POSTGRES_PASSWORD`` later,
+you must also update the password in PostgreSQL; editing the file alone does
+not change an existing database account.
 
-Connect Django to PostgreSQL
---------------------------------
+Step 4: Connect Django to the database network
+----------------------------------------------
 
 From the checkout root, create ``pubhub/compose.deployment.yml``:
 
@@ -88,14 +120,14 @@ From the checkout root, create ``pubhub/compose.deployment.yml``:
    networks:
      default: {}
 
-The checked-in production Compose file attaches Django only to the external
-proxy network while PostgreSQL uses the default application network. This
-deployment override gives Django access to both. All application commands below
-include both files. Keep this operator-created override with your deployment
-configuration; it need not be committed to the repository.
+The production Compose file connects Django to the proxy network and PostgreSQL
+to the application network. This additional Compose file connects Django to
+both networks so it can reach the database. Every application command below
+includes both files. Keep ``compose.deployment.yml`` with your deployment
+configuration.
 
-Configure and start Traefik
--------------------------------
+Step 5: Install the TLS certificate
+-----------------------------------
 
 On the Linux host, place your certificate chain at
 ``/etc/publication-hub/tls/cert.pem`` and its private key at
@@ -114,7 +146,11 @@ Traefik's root user must be able to read both files. Copy actual certificate
 contents: symlinks to files outside the mounted directory will not resolve inside
 the container.
 
-From the checkout root, create ``traefik/.env``:
+Step 6: Configure Traefik
+-------------------------
+
+From the repository root (``publication-site``), create ``traefik/.env``.
+Replace the example domain with your domain:
 
 .. code-block:: text
 
@@ -132,22 +168,36 @@ Create ``traefik/compose.deployment.yml``:
 
 Compose replaces the original volume mount at ``/etc/traefik/ssl`` with this
 read-only bind mount. Traefik expects the filenames ``cert.pem`` and ``key.pem``.
-The domain and subdirectory are baked into the proxy image during its build.
-From the checkout root:
+Traefik's domain configuration is included in the image during the build.
+
+Step 7: Build and start Traefik
+-------------------------------
+
+From the repository root:
 
 .. code-block:: bash
 
    cd traefik
    docker compose -p traefik -f docker-compose.prod.yml -f compose.deployment.yml config --quiet
+
+If validation succeeds, build and start the proxy:
+
+.. code-block:: bash
+
    docker compose -p traefik -f docker-compose.prod.yml -f compose.deployment.yml up --build -d
+
+Confirm that its network exists:
+
+.. code-block:: bash
+
    docker network inspect traefik_default --format '{{.Name}}'
 
 The final command should print ``traefik_default``. Always use ``-p traefik``:
 it creates the external network expected by the application. Until Django starts,
 the proxy may return a gateway error.
 
-Build and initialize the application
-----------------------------------------
+Step 8: Build the application and create the database
+-----------------------------------------------------
 
 From ``publication-site/traefik``, enter the application directory:
 
@@ -155,100 +205,172 @@ From ``publication-site/traefik``, enter the application directory:
 
    cd ../pubhub
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml config --quiet
+
+If validation succeeds, build the application and database images:
+
+.. code-block:: bash
+
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml build
+
+Start PostgreSQL:
+
+.. code-block:: bash
+
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml up -d postgres
+
+Create the database tables:
+
+.. code-block:: bash
+
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml run --rm django python manage.py migrate
+
+After migrations finish, create the administrator account. Run this command by
+itself and answer its prompts before continuing:
+
+.. code-block:: bash
+
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml run --rm django python manage.py createsuperuser
 
-The application entrypoint waits for PostgreSQL. Migrations should finish
-successfully and administrator creation should prompt for your credentials.
-Optionally load bundled climate metadata (no publication records):
+The application waits for PostgreSQL to accept connections before running each
+management command. Migrations should finish without errors. When prompted,
+enter a username, email address, and password for the administrator account.
+
+Step 9: Load optional climate metadata
+--------------------------------------
+
+To add the bundled climate project tags and journal names, run this command
+from ``publication-site/pubhub``. Skip this step if you plan to create your own
+metadata through the administrator interface.
 
 .. code-block:: bash
 
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml run --rm django python manage.py initialize
 
-Launch and verify
----------------------
+Initialization does not create publication records. See :ref:`metadata` for
+details.
+
+Step 10: Start the application
+------------------------------
 
 Still in ``publication-site/pubhub``:
 
 .. code-block:: bash
 
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml up -d
+
+Startup collects static files and starts Gunicorn on port 5000. Database
+migrations must be run separately, as in step 8.
+
+Step 11: Verify the deployment
+------------------------------
+
+From ``publication-site/pubhub``, check the application and database migrations,
+then inspect the service status and recent logs:
+
+.. code-block:: bash
+
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml exec django python manage.py check
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml exec django python manage.py migrate --check
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml ps
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml logs --tail=100 django postgres
 
-Production startup collects static files and starts Gunicorn on port 5000.
-It does **not** run migrations or initialize metadata; those explicit commands
-above are required when appropriate. The checks should succeed and both services
-should remain running. From any directory, using your real domain:
+The checks should succeed and both services should remain running. From any
+directory, check HTTP and HTTPS access, replacing the example domain with yours:
 
 .. code-block:: bash
 
-   curl -I http://publications.example.org/
-   curl -I https://publications.example.org/
-   curl -I https://publications.example.org/static/uswds/css/uswds.min.css
+   curl -sS -o /dev/null -w '%{http_code}\n' http://publications.example.org/
+   curl -sS -o /dev/null -w '%{http_code}\n' https://publications.example.org/
+   curl -sS -o /dev/null -w '%{http_code}\n' https://publications.example.org/static/uswds/css/uswds.min.css
 
-Expect an HTTP-to-HTTPS redirect and HTTP 200 for both HTTPS requests, with a
-trusted certificate. Open ``https://publications.example.org/admin/`` and sign in.
+The HTTP request should redirect to HTTPS. Both HTTPS requests should return
+HTTP 200 with a trusted certificate. Open your site's ``/admin/`` page and sign
+in with the administrator account you created in step 8. Configure
+:ref:`recaptcha` and :ref:`email` before using public registration or password
+reset.
+
+The commands above use GET. A HEAD request to the homepage (``curl -I``) returns
+HTTP 405 and is not a suitable homepage availability check.
+
 To test before DNS changes, use ``curl --resolve publications.example.org:443:HOST_IP
--I https://publications.example.org/``, replacing ``HOST_IP`` with the server IP.
+-sS -o /dev/null -w '%{http_code}\n' https://publications.example.org/``, replacing ``HOST_IP`` with the server IP.
 Do not bypass certificate verification for a deployment acceptance check.
 
-Operation and backups
--------------------------
+Stop and resume
+---------------
 
 Application commands run from ``publication-site/pubhub`` and retain the same
-project name and override. To stop, resume, or restart:
+project name and both Compose files. To stop the application stack:
 
 .. code-block:: bash
 
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml stop
+
+To start it again:
+
+.. code-block:: bash
+
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml start
-   docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml restart
 
 Run the HTTPS checks and verify your administrator login after resuming. Named
 volumes retain PostgreSQL data, backups, and Django logs across restarts or
 ``down``/``up``. Do not delete volumes as routine maintenance. The production
 Compose files have no restart policy; arrange service startup after host reboots
-and confirm availability rather than assuming automatic recovery.
+and verify that the site is available after each reboot.
 
-For an application update, review the migration guide and take a backup first.
-From ``publication-site/pubhub``, after updating your checkout:
+Update the application
+----------------------
 
-.. code-block:: bash
+1. Review the migration guide linked from :doc:`Getting Started`.
+2. Back up the database using the instructions below.
+3. Update your repository checkout to the version you intend to deploy.
+4. From ``publication-site/pubhub``, rebuild the image, stop Django, apply
+   migrations, and start the application:
 
-   docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml build
-   docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml stop django
-   docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml run --rm django python manage.py migrate
-   docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml up -d
+   .. code-block:: bash
 
-Repeat the launch verification. Source and dependency changes require rebuilding;
-environment changes require recreation (``up -d --force-recreate``). To inspect
+      docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml build
+      docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml stop django
+      docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml run --rm django python manage.py migrate
+      docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml up -d
+
+Repeat the checks in step 11. Code and dependency changes require rebuilding the
+image; environment changes require recreating containers with
+``up -d --force-recreate`` and the same project name and Compose files. To inspect
 application request logs stored in the volume:
 
 .. code-block:: bash
 
    docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml exec django tail -n 100 /var/log/django/publications-site.log
 
-For a database backup, with PostgreSQL running, from ``publication-site/pubhub``:
+Back up the database
+--------------------
 
-.. code-block:: bash
+1. Make sure PostgreSQL is running.
+2. From ``publication-site/pubhub``, create a backup, copy it to the host, and
+   check that the compressed files can be read:
 
-   docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml exec postgres backup
-   mkdir -p backups
-   docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml cp postgres:/backups/. ./backups/
-   gzip -t backups/backup_*.sql.gz
+   .. code-block:: bash
 
-The backup command reports its filename; ``gzip -t`` should exit successfully.
-Copy backups to protected off-host storage and rehearse a restore using the
-migration helper documentation. The backup volume alone is not an off-host
-backup. A live ``pg_dump`` is a consistent database snapshot; migration cutovers
-require stopping all writers as described in the migration guide. Back up your
-environment, overrides, and certificates separately.
+      docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml exec postgres backup
+      mkdir -p backups
+      docker compose -p pubhub -f docker-compose.prod.yml -f compose.deployment.yml cp postgres:/backups/. ./backups/
+      gzip -t backups/backup_*.sql.gz
+
+   The backup command reports its filename. ``gzip -t`` should finish without
+   errors.
+
+3. Copy the backup files to protected storage on another host.
+4. Rehearse a restore using the migration helper documentation linked from
+   :doc:`Getting Started`.
+5. Back up your environment files, Compose overrides, and certificates separately.
+
+A live ``pg_dump`` produces a consistent database snapshot. For a migration
+cutover, stop all processes that write to the database as described in the
+migration guide.
+
+Maintain Traefik
+----------------
 
 Proxy commands run from ``publication-site/traefik``:
 
@@ -256,10 +378,31 @@ Proxy commands run from ``publication-site/traefik``:
 
    docker compose -p traefik -f docker-compose.prod.yml -f compose.deployment.yml logs --tail=100 traefik
    docker compose -p traefik -f docker-compose.prod.yml -f compose.deployment.yml exec traefik tail -n 100 /var/log/traefik/access.log
+
+To stop the proxy:
+
+.. code-block:: bash
+
    docker compose -p traefik -f docker-compose.prod.yml -f compose.deployment.yml stop
+
+To start it again:
+
+.. code-block:: bash
+
    docker compose -p traefik -f docker-compose.prod.yml -f compose.deployment.yml start
 
-After replacing renewed certificate files, restart Traefik with the same flags
-and ``restart``. After changing ``traefik/.env`` or its templates, use the same
-flags with ``up --build -d``. Recheck HTTPS and the served certificate. Stop the
-application first if removing the proxy stack: its external network is shared.
+After copying renewed certificates to the paths in step 5, restart Traefik:
+
+.. code-block:: bash
+
+   docker compose -p traefik -f docker-compose.prod.yml -f compose.deployment.yml restart
+
+After changing ``traefik/.env`` or its templates, rebuild and recreate the proxy:
+
+.. code-block:: bash
+
+   docker compose -p traefik -f docker-compose.prod.yml -f compose.deployment.yml up --build -d
+
+Repeat the HTTPS checks in step 11 and confirm that the served certificate is
+valid. Before removing the proxy stack, stop and remove the application
+containers so they no longer use the shared ``traefik_default`` network.
