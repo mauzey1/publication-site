@@ -30,40 +30,23 @@ From the directory where you want to store the repository:
 
    git clone https://github.com/aims-group/publication-site.git
    cd publication-site/pubhub
-   mkdir -p .envs
 
 Run all remaining commands from ``publication-site/pubhub``.
 
 Step 3: Create the environment files
 ------------------------------------
 
-Create ``.envs/.django`` with the following contents. These example credentials
-are for local development only. If the file already exists, review its values
-before making changes.
+For a fresh checkout, copy the tracked ``.envs/.django.example`` and
+``.envs/.postgres.example`` files into the names Compose expects:
 
-.. code-block:: text
+.. code-block:: bash
 
-   DJANGO_SETTINGS_MODULE=config.settings.docker
-   DJANGO_SECRET_KEY=unsafe-local-development-key
-   DJANGO_LOGGING_FILENAME=/var/log/django/publications-site.log
-   DJANGO_LOGGING_LEVEL=INFO
-   RECAPTCHA_PUBLIC_KEY=
-   RECAPTCHA_PRIVATE_KEY=
-   EMAIL_HOST=localhost
-   EMAIL_PORT=1025
-   DEFAULT_FROM_EMAIL=Publication Hub <noreply@localhost>
+   cp .envs/.django.example .envs/.django
+   cp .envs/.postgres.example .envs/.postgres
 
-Create ``.envs/.postgres``:
-
-.. code-block:: text
-
-   POSTGRES_HOST=postgres
-   POSTGRES_PORT=5432
-   POSTGRES_DB=pubhub
-   POSTGRES_USER=pubhub
-   POSTGRES_PASSWORD=unsafe-local-database-password
-
-Git ignores both files. Compose loads their values into the containers when it
+The example credentials are for local development only. If either destination
+file already exists, review its values instead of overwriting it. Git ignores
+the copied files but keeps the examples visible. Compose loads their values when it
 creates them. ``DJANGO_SETTINGS_MODULE=config.settings.docker`` selects the
 PostgreSQL settings. Containers connect to PostgreSQL at ``postgres:5432``;
 tools on your host connect at ``localhost:5433``.
@@ -126,8 +109,8 @@ Both services should be running, the management checks should succeed, and both 
 should return HTTP 200. Log in at http://127.0.0.1:8000/admin/ with your new
 administrator account. Registration separately requires :ref:`recaptcha`.
 
-Use GET requests as shown above. The homepage returns HTTP 405 for HEAD requests
-(``curl -I``), even when the site is working.
+Use GET requests as shown above to check the homepage. It returns HTTP 405 for
+other request methods, even when the site is working.
 
 Apply changes
 -------------

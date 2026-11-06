@@ -19,5 +19,5 @@ pubhub_configs/backups
 
 # Environment files
 .env
-.envs/*
-!.envs/.local/
+**/.envs/*
+!**/.envs/*.example

@@ -1,0 +1,9 @@
+DJANGO_SETTINGS_MODULE=config.settings.docker
+DJANGO_SECRET_KEY=unsafe-local-development-key
+DJANGO_LOGGING_FILENAME=/var/log/django/publications-site.log
+DJANGO_LOGGING_LEVEL=INFO
+RECAPTCHA_PUBLIC_KEY=
+RECAPTCHA_PRIVATE_KEY=
+EMAIL_HOST=localhost
+EMAIL_PORT=1025
+DEFAULT_FROM_EMAIL=Publication Hub <noreply@localhost>

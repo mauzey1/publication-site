@@ -45,7 +45,6 @@ On the server, start in the directory where you want to store the repository:
 
    git clone https://github.com/aims-group/publication-site.git
    cd publication-site
-   mkdir -p pubhub/.envs
 
 Step 3: Create the application environment file
 -----------------------------------------------
@@ -65,28 +64,17 @@ Save that output as the Django secret key. Then generate the database password:
 
    openssl rand -hex 32
 
-From the checkout root, create ``pubhub/.envs/.prod.env`` with the following
-contents. Paste the first output into ``DJANGO_SECRET_KEY`` and the second into
-``POSTGRES_PASSWORD``, replacing the placeholders. Replace the example domain
-with your domain:
+From the checkout root, copy the tracked example file:
 
-.. code-block:: text
+.. code-block:: bash
 
-   DJANGO_SETTINGS_MODULE=config.settings.production
-   DJANGO_SECRET_KEY=REPLACE_WITH_FIRST_RANDOM_VALUE
-   DJANGO_ALLOWED_HOSTS=publications.example.org
-   DJANGO_LOGGING_FILENAME=/var/log/django/publications-site.log
-   DJANGO_LOGGING_LEVEL=INFO
-   POSTGRES_HOST=postgres
-   POSTGRES_PORT=5432
-   POSTGRES_DB=pubhub
-   POSTGRES_USER=pubhub
-   POSTGRES_PASSWORD=REPLACE_WITH_SECOND_RANDOM_VALUE
-   RECAPTCHA_PUBLIC_KEY=
-   RECAPTCHA_PRIVATE_KEY=
-   EMAIL_HOST=localhost
-   EMAIL_PORT=1025
-   DEFAULT_FROM_EMAIL=Publication Hub <noreply@publications.example.org>
+   cp pubhub/.envs/.prod.env.example pubhub/.envs/.prod.env
+
+If ``pubhub/.envs/.prod.env`` already exists, review it instead of overwriting
+it. Edit the copied file: paste the first random output into
+``DJANGO_SECRET_KEY`` and the second into ``POSTGRES_PASSWORD``, replacing the
+placeholders. Replace the example domain with your domain in
+``DJANGO_ALLOWED_HOSTS`` and ``DEFAULT_FROM_EMAIL``.
 
 ``DJANGO_ALLOWED_HOSTS`` is a comma-separated list of hostnames without schemes
 or paths. The explicit log path is required: the image runs as a non-root user
@@ -149,13 +137,15 @@ the container.
 Step 6: Configure Traefik
 -------------------------
 
-From the repository root (``publication-site``), create ``traefik/.env``.
-Replace the example domain with your domain:
+From the repository root (``publication-site``), copy the tracked Traefik
+example. If ``traefik/.env`` already exists, review it instead of overwriting
+it:
 
-.. code-block:: text
+.. code-block:: bash
 
-   DOMAIN_NAME=publications.example.org
-   DOMAIN_SUBDIRECTORY=
+   cp traefik/.env.example traefik/.env
+
+Edit ``traefik/.env`` and replace the example domain with your domain.
 
 Create ``traefik/compose.deployment.yml``:
 
@@ -289,8 +279,8 @@ in with the administrator account you created in step 8. Configure
 :ref:`recaptcha` and :ref:`email` before using public registration or password
 reset.
 
-The commands above use GET. A HEAD request to the homepage (``curl -I``) returns
-HTTP 405 and is not a suitable homepage availability check.
+The homepage accepts only GET requests. Other request methods return HTTP 405,
+so use the commands above to check its availability.
 
 To test before DNS changes, use ``curl --resolve publications.example.org:443:HOST_IP
 -sS -o /dev/null -w '%{http_code}\n' https://publications.example.org/``, replacing ``HOST_IP`` with the server IP.
